@@ -4,6 +4,8 @@
 отрицательным скорингом (неупотребимые слова).
 
 26-10-2019 - переход на хранение части словарной базы в SQLite3
+
+17-06-2020 refs #1 возникает ошибка при работе из нескольких тредов, добавил check_same_thread=False
 """
 
 from __future__ import print_function
@@ -15,7 +17,6 @@ import pickle
 import io
 import argparse
 import sqlite3
-
 
 
 def create_trie_node(char):
@@ -89,7 +90,8 @@ class RuWord2Tags:
             self.db_filepath = os.path.join(os.path.dirname(dict_path), 'ruword2tags.db')
 
         try:
-            self.cnx = sqlite3.connect(self.db_filepath)
+            # 17-06-2020 refs #1 возникает ошибка при работе из нескольких тредов, добавил check_same_thread=False
+            self.cnx = sqlite3.connect(self.db_filepath, check_same_thread=False)
         except Exception as ex:
             msg = u'Could not open db file "{}", error: {}'.format(self.db_filepath, ex)
             raise RuntimeError(msg)
@@ -156,8 +158,8 @@ def run_tests(dict_path=None):
     word2tags.load(dict_path)
 
     cases = [(u'очень', [u'НАРЕЧИЕ СТЕПЕНЬ=АТРИБ ТИП_МОДИФ=ГЛАГ ТИП_МОДИФ=НАРЕЧ ТИП_МОДИФ=ПРИЛ']),
-             (u'поскорее', [u'НАРЕЧИЕ СТЕПЕНЬ=СРАВН']),
-             (u'поскорей', [u'НАРЕЧИЕ СТЕПЕНЬ=СРАВН']),
+             (u'поскорее', [u'НАРЕЧИЕ СТЕПЕНЬ=СРАВН ТИП_МОДИФ=ГЛАГ']),
+             (u'поскорей', [u'НАРЕЧИЕ СТЕПЕНЬ=СРАВН ТИП_МОДИФ=ГЛАГ']),
              (u'сильнее', [u'НАРЕЧИЕ СТЕПЕНЬ=СРАВН', u'ПРИЛАГАТЕЛЬНОЕ КРАТКИЙ=0 СТЕПЕНЬ=СРАВН']),
              (u'синее', [u'ПРИЛАГАТЕЛЬНОЕ КРАТКИЙ=0 ПАДЕЖ=ВИН РОД=СР СТЕПЕНЬ=АТРИБ ЧИСЛО=ЕД', u'ПРИЛАГАТЕЛЬНОЕ КРАТКИЙ=0 ПАДЕЖ=ИМ РОД=СР СТЕПЕНЬ=АТРИБ ЧИСЛО=ЕД']),
              (u'трахее', [u'СУЩЕСТВИТЕЛЬНОЕ ОДУШ=НЕОДУШ ПАДЕЖ=ДАТ РОД=ЖЕН ЧИСЛО=ЕД', u'СУЩЕСТВИТЕЛЬНОЕ ОДУШ=НЕОДУШ ПАДЕЖ=ПРЕДЛ РОД=ЖЕН ЧИСЛО=ЕД']),
