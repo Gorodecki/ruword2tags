@@ -17,6 +17,7 @@ import pickle
 import io
 import argparse
 import sqlite3
+import threading
 
 
 def create_trie_node(char):
@@ -73,6 +74,7 @@ class RuWord2Tags:
         self.trie_tagsets = None
         self.db_filepath = None
         self.cnx = None
+        self.lock = threading.Lock()
         self.word2tagsets_cache = dict()
 
     def load(self, dict_path=None):
@@ -135,12 +137,13 @@ class RuWord2Tags:
                     yield self.index2tagset[itagset]
                 hit = True
             else:
-                for r in self.cur.execute('SELECT id_tagsets FROM word_tagsets WHERE word=:word', {'word': word}):
-                    id_tagsets = int(r[0])
-                    self.word2tagsets_cache[word] = id_tagsets
-                    for itagset in self.id2tagsets[id_tagsets]:
-                        yield self.index2tagset[itagset]
-                    hit = True
+                with self.lock:  # для многопоточной работы в чатботе
+                    for r in self.cur.execute('SELECT id_tagsets FROM word_tagsets WHERE word=:word', {'word': word}):
+                        id_tagsets = int(r[0])
+                        self.word2tagsets_cache[word] = id_tagsets
+                        for itagset in self.id2tagsets[id_tagsets]:
+                            yield self.index2tagset[itagset]
+                        hit = True
 
         if not hit:
             for ending_len in reversed(self.ending_lens):
